@@ -1,0 +1,102 @@
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "github.com/lisyaoran51/GoGameServerTest/protobuf"; 
+
+import "protobuf/common_game.proto"; // 遊戲端通用協議
+import "protobuf/diamonds/common.proto"; // 遊戲端
+import "protobuf/gate.proto"; // gate端
+import "protobuf/gate_game.proto"; // gate 與 game 的內部協議
+
+// 共通標頭檔
+// 
+// 傳送與接收的前置標頭檔，用以告知後方內容該如何解析。
+message Header {
+	string uuid = 1; // UUID
+	oneof payload {
+		Heartbeat heartbeat = 3; // 心跳包
+		
+		//table
+		TS_CommonEnterTable tsCommonEnterTable = 11;
+		CommonEnterTableRes commonEnterTableRes = 12;
+		TS_CommonLeaveTable tsCommonLeaveTable = 13;
+		CommonLeaveTableRes commonLeaveTableRes = 14;
+		TableList tableList= 15;
+		TableCurrencyInfo tableCurrencyInfo = 16;
+		PlayerCanUseCurrencyData playerCanUseCurrencyData = 17;
+
+		//Game
+		KickPlayer kickPlayer = 30;
+		IdleKickNotice idleKickNotice = 31;
+		ChatID chatId = 32;
+		TS_SentChatMessage tsSentChatMessage = 33;
+		SentChatMessageR sentChatMessageR = 34;
+		ChatMessageBoardcast chatMessageBoardcast = 35;
+		KickTable kickTable = 36;
+		CurrencyDataList currencyDataList = 37;
+		TS_RefreshCurrencyDataList tsRefreshCurrencyDataList = 38;
+
+		//exchange
+		ProductExchangeRate productExchangeRate = 50;
+		ClientUsingCurrency clientUsingCurrency = 51;
+
+		//Gate
+		ClientConnectRequest clientConnectRequest = 101;
+		ClientConnectResponse clientConnectResponse = 102;
+
+		//Gate <-> Game
+		GateLoginRequest gateLoginRequest = 201;
+		GateLoginResponse gateLoginResponse = 202;
+
+		//game <-> gate to cash api
+		CASH_API_BET_DEDUCT cashApiBetDeduct = 301;
+		CASH_API_BET_DEDUCT_RES cashApiBetDeductRes = 302;
+		CASH_API_WIN_ACCOUNT cashApiWinAccount = 303;
+		CASH_API_WIN_ACCOUNT_RES cashApiWinAccountRes = 304;
+		CASH_API_CANCEL_ACCOUNT cashApiCancelAccount = 305;
+		CASH_API_CANCEL_ACCOUNT_RES cashApiCancelAccountRes = 306;
+		CASH_API_ROLLBACK_ACCOUNT cashApiRollbackAccount = 307;
+		CASH_API_ROLLBACK_ACCOUNT_RES cashApiRollbackAccountRes = 308;
+		CASH_API_QUERY_CURRENCY_LIST cashApiQueryCurrencyList = 309;
+		CASH_API_QUERY_CURRENCY_LIST_RES cashApiQueryCurrencyListRes = 310;
+
+		//Crash header
+		// crash.CHeader crashCHeader = 1001;
+		
+		//Plinko header
+		// plinko.CHeader plinkoCHeader = 2001;
+		
+		//Hilo header
+		// hilo.CHeader hiloCHeader = 2011;
+		
+		//Keno header
+		// keno.CHeader kenoCHeader = 2021;
+		
+		//Limbo header
+		// limbo.CHeader limboCHeader = 2031;
+
+		//Mines header
+		// mines.CHeader minesCHeader = 2041;
+		
+		//Dice header
+		// dice.CHeader diceCHeader = 2051;
+		
+		//Poker header
+		// poker.CHeader pokerCHeader = 2061;
+		
+		//blackjack header
+		// blackjack.CHeader blackjackCHeader = 2071;
+		
+		//diamonds header
+		diamonds.CHeader diamondsCHeader = 2081;
+		
+		//wheel header
+		// wheel.CHeader wheelCHeader = 2091;
+	}
+}
+
+// 心跳包
+// 用以確認端點是否存活，收到的端點必須盡快回覆。
+message Heartbeat {
+}

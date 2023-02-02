@@ -1,0 +1,35 @@
+// This is Proto v3 syntax。
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "github.com/lisyaoran51/GoGameServerTest/protobuf"; 
+
+
+//// GateLoginRequest Gate登入協議
+message GateLoginRequest {
+	string name = 1;					 // 用戶帳號
+	enum User_Level {
+		PLAYER = 0;
+		GUEST = 1;
+	}
+	User_Level user_Level = 2;	 		// 用户類型
+	string productid = 3;				// 用戶產品編號
+	string FiatCurrency = 4;			// 用戶用的法幣
+	string VirtualCurrency = 5;			// 用戶用的虛擬幣
+	message CurrencyData {
+		string currencyType = 1;		//貨幣種類
+		string amount = 2;				//貨幣數量
+	}
+	repeated CurrencyData currency = 6;	// 用戶身上的貨幣類別 可為空
+	string token = 7;					// 用戶Token
+}
+
+// gateLoginResponse Gate登入協議回包
+message GateLoginResponse {
+	uint32 code = 1;		// 結果
+	string username = 2; // 使用者名稱
+	string cryptoCurrency = 3;		// 使用虛擬貨幣
+	string fiatCurrency = 4;		// 使用法幣 沒使用會是空字串
+};
+

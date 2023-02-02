@@ -1,0 +1,136 @@
+// This is Proto v3 syntax。
+syntax = "proto3";  
+
+package protobuf;
+
+option go_package = "github.com/lisyaoran51/GoGameServerTest/protobuf"; 
+
+// 共用的請求進桌
+message TS_CommonEnterTable {
+	string tableid = 1;		// 請求進入的桌號
+}
+
+// 共用的請求進桌回應
+message CommonEnterTableRes {
+	string tableid = 1;		// 請求進入的桌號
+	uint32 code = 2;		// 錯誤代碼
+}
+
+// 共用的請求離桌
+message TS_CommonLeaveTable {
+	string tableid = 1;		// 請求的桌號
+}
+
+// 共用的請求離桌回應
+message CommonLeaveTableRes {
+	string tableid = 1;		// 請求的桌號
+	uint32 code = 2;		// 錯誤代碼
+}
+
+
+message KickPlayer {
+	uint32 reason = 1;				//踢人的理由 0閒置局數過多 1閒置秒數過久 2被操盤ban掉 3:CBGO沒有下一局，回合結束時踢人 4: 維護中 5: Pid 禁用中
+	string name = 2;				//玩家pid+username
+}
+
+message IdleKickNotice{
+	uint32 reason = 1;				//踢人的理由 0閒置局數過多 1閒置秒數過久 2被操盤ban掉
+	string name = 2;				//玩家pid+username
+	uint32 idleround = 3;			//已經閒置幾局
+	uint32 remainround = 4;			//剩下閒置幾局會被踢掉
+}
+
+message KickTable {
+	uint32 reason = 1;				//踢人的理由 0閒置局數過多 1閒置秒數過久 2被操盤ban掉
+	string name = 2;				//玩家pid+username
+}
+
+// 聊天用玩家ID
+message ChatID{
+	uint32 chatid = 1; // 聊天用玩家ID
+}
+
+// 聊天訊息
+message TS_SentChatMessage{
+	string message = 1; //聊天訊息
+}
+
+// 聊天訊息回包
+message SentChatMessageR{
+	uint32 code = 1; // 結果
+}
+
+// 廣播聊天訊息
+message ChatMessageBoardcast{
+	uint32 chatid = 1; // 聊天用玩家ID
+	string message = 2; // 訊息
+	string maskName = 3; // 玩家名稱
+}
+
+
+// 桌台資訊
+// 包含 *桌號* *狀態Flag*
+message TableData {
+	string tableid = 1;				// 桌號
+	uint32 flag = 2;				// 狀態Flag
+	// 其餘資訊待補充
+}
+
+//桌台清單廣播
+message TableList {
+	repeated TableData data = 1;
+}
+
+message GameCurrencyData {
+	string name = 1;		// 貨幣名稱
+	string limitmin = 2;	// 最小投注單位
+	string limitmax = 3;	// 最大投注單位
+	string profitlimit = 4;	// 獲利上限
+	uint32 currencyType = 5;// 類型 0:虛擬 1:法幣
+}
+
+message TableCurrencyInfo {
+	string tableid = 1;								// 桌號
+	uint32 maxRate = 2;								// 最大開獎倍率
+	uint32 minRate = 3;								// 最小開獎倍率
+	repeated GameCurrencyData currencydata = 4;		// 貨幣資料
+}
+
+message PlayerCanUseCurrencyData {
+	repeated string playerCanUseCurrency = 1;		// 玩家可以使用的貨幣資料	
+}
+
+message ExchangeRateData {
+	string source = 1;			//來源貨幣
+	message DestData {
+		string dest = 1;			//目標貨幣
+		string rate = 2;			//匯率
+	}
+	repeated DestData destData = 2;	//清單
+}
+
+message ProductExchangeRate {
+	string pid = 1;							//產品編號
+	repeated ExchangeRateData data = 2;		//匯率資料
+}
+
+message ClientUsingCurrency {
+	string username = 1;			// 玩家名稱
+	string cryptoCurrency = 2;		// 使用虛擬貨幣
+	string fiatCurrency = 3;		// 使用法幣 沒使用會是空字串
+}
+
+// 更新貨幣資訊
+message CurrencyDataList {
+	message CurrencyData {
+		string currencyType = 1;		    //貨幣種類
+		string amount = 2;				    //貨幣數量
+	}
+	repeated CurrencyData currency = 1;	    // 用戶身上的貨幣類別
+	//auxiliary.GameRoundInfo roundinfo = 2;	// gameround 資訊
+	string timestamp = 2; 					// 時間戳記
+}
+
+// 請求刷新貨幣資訊
+message TS_RefreshCurrencyDataList {
+}

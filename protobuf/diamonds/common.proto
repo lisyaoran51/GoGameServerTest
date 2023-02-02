@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+package diamonds;
+
+option go_package = "github.com/lisyaoran51/GoGameServerTest/protobuf/diamonds"; 
+
+import "protobuf/diamonds/game.proto"; // diamonds 遊戲端
+
+// 共通標頭檔
+// 
+// 傳送與接收的前置標頭檔，用以告知後方內容該如何解析。
+message CHeader {
+	oneof payload {
+		DIAMONDS_TS_BET diamondsTsBet = 101;
+		DIAMONDS_BET_RES diamondsBetRes = 102;
+		DIAMONDS_TS_CHANGE_SEED diamondsTsChangeSeed = 103;
+		DIAMONDS_CHANGE_SEED_RES diamondsChangeSeedRes = 104;
+		DIAMONDS_INFO diamondsInfo = 105;
+		DIAMONDS_GAME_INFO_LIST diamondsGameInfoList = 106;
+	}
+}
+

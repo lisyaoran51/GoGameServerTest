@@ -1,0 +1,169 @@
+// This is Proto v3 syntax。
+syntax = "proto3";
+
+package protobuf;
+
+option go_package = "github.com/lisyaoran51/GoGameServerTest/protobuf"; 
+
+//// ClientConnect 玩家連線Gate協議
+message ClientConnectRequest {
+	string pid = 1; //產品
+	string token = 2; //加密後玩家資訊
+	string gameType = 3; //登入的遊戲類型 //MultiPlayerCrash, StandAlonePlinko
+}
+
+// ClientConnectResponse 登入用回包
+message ClientConnectResponse {
+	uint32 code = 1; // 成功0  非0為錯誤碼
+	string pid = 2; // 使用者產品線
+	string username = 3; // 使用者名稱
+	string cryptoCurrency = 4;		// 使用虛擬貨幣
+	string fiatCurrency = 5;		// 使用法幣 沒使用會是空字串
+};
+
+// -----------扣款API相關
+
+// 玩家跟API請求下注扣款
+message CASH_API_BET_DEDUCT {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度 小數最小只能到0.00000001
+	string name = 4;						// 玩家姓名
+	string productid = 5;					// 產品編號
+	string billno = 6;						// 注單號
+	string reqpostid = 7;					// 給gate組require id用 billno + reqpostid = require id
+	string gametype = 8;					// 遊戲型態
+	string timestamp = 9;					// 時間戳記
+	string token = 10;						// 玩家Token
+}
+
+// 玩家跟API請求下注扣款回應
+message CASH_API_BET_DEDUCT_RES {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度
+	string sourceamount = 4;				// 變化前的額度
+	string destamount = 5;					// 玩家最新的額度
+	string name = 6;						// 玩家姓名
+	string productid = 7;					// 產品編號
+	string reqid = 8;						// 注單號+req postfix
+	uint32 code = 9;						// 結果回應
+	string transactionid = 10;				// api回應的交易序號
+	string timestamp = 11;					// 時間戳記
+}
+
+// 玩家跟API請求 增加贏錢
+message CASH_API_WIN_ACCOUNT {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度 小數最小只能到0.00000001
+	string name = 4;						// 玩家姓名
+	string productid = 5;					// 產品編號
+	string billno = 6;						// 注單號
+	string reqpostid = 7;					// 給gate組require id用 billno + reqpostid = require id
+	string gametype = 8;					// 遊戲型態
+	string timestamp = 9;					// 時間戳記
+	string token = 10;						// 玩家Token
+}
+
+// 玩家跟API請求 增加贏錢回應
+message CASH_API_WIN_ACCOUNT_RES {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度
+	string sourceamount = 4;				// 變化前的額度
+	string destamount = 5;					// 玩家最新的額度
+	string name = 6;						// 玩家姓名
+	string productid = 7;					// 產品編號
+	string reqid = 8;						// 注單號+req postfix
+	uint32 code = 9;						// 結果回應
+	string transactionid = 10;				// api回應的交易序號
+	string token = 11;						// 玩家Token
+	string timestamp = 12;					// 時間戳記
+}
+
+// 玩家跟API請求 請求回滾款項（退款）
+message CASH_API_ROLLBACK_ACCOUNT {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string billno = 2;						// 注單號
+	string reqpostid = 3;					// 給gate組require id用 billno + reqpostid = require id
+	string name = 4;						// 玩家姓名
+	string productid = 5;					// 產品編號
+	string gametype = 6;					// 遊戲型態
+	string transactionid = 7;				// 請求取消的交易編號
+	string timestamp = 8;					// 時間戳記
+	string token = 9;						// 玩家Token
+	string previousTransAmount = 10;		// 先前交易額度 原本轉帳時的交易額度，rollback會依這個額度回滾，小數最小只能到0.00000001
+}
+
+// 玩家跟API請求 請求回滾款項（退款）回應
+message CASH_API_ROLLBACK_ACCOUNT_RES {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 金額 小數最小只能到0.00000001
+	string name = 4;						// 玩家姓名
+	string productid = 5;					// 產品編號
+	string billno = 6;						// 注單號
+	uint32 code = 7;						// 結果回應
+	string currentamount = 8;				// 玩家最新的額度
+	string preamount = 9;					// 變化前的額度
+	string transactionid = 10;				// 次rollback對應的交易序號
+	string timestamp = 11;					// 時間戳記
+}
+
+// 玩家跟API請求 請求退款（取消）
+message CASH_API_CANCEL_ACCOUNT {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度 小數最小只能到0.00000001
+	string name = 4;						// 玩家姓名
+	string productid = 5;					// 產品編號
+	string billno = 6;						// 注單號
+	string reqpostid = 7;					// 給gate組require id用 billno + reqpostid = require id
+	string gametype = 8;					// 遊戲型態
+	string timestamp = 9;					// 時間戳記
+	string token = 10;						// 玩家Token
+}
+
+// 玩家跟API請求 請求退款（取消）回應
+message CASH_API_CANCEL_ACCOUNT_RES {
+	// auxiliary.GameRoundInfo roundinfo = 1;	// gameround 資訊
+	string roundinfo = 1;
+	string currency = 2;					// 幣種
+	string transAmount = 3;					// 交易額度
+	string sourceamount = 4;				// 變化前的額度
+	string destamount = 5;					// 玩家最新的額度
+	string name = 6;						// 玩家姓名
+	string productid = 7;					// 產品編號
+	string reqid = 8;						// 注單號+req postfix
+	uint32 code = 9;						// 結果回應
+	string transactionid = 10;				// api回應的交易序號
+	string timestamp = 11;					// 時間戳記
+}
+
+// 玩家跟API請求 查詢貨幣列表
+message CASH_API_QUERY_CURRENCY_LIST {
+	string productid = 1;					// 產品編號
+	string name = 2;						// 玩家姓名
+	string token = 3;						// 玩家Token
+}
+
+// 玩家跟API請求 查詢貨幣列表回應
+message CASH_API_QUERY_CURRENCY_LIST_RES {
+	message CurrencyData {
+		string currencyType = 1;		//貨幣種類
+		string amount = 2;				//貨幣數量
+	}
+	repeated CurrencyData currency = 1;	// 用戶身上的貨幣類別
+	string name = 2;						// 玩家姓名
+	string productid = 3;					// 產品編號
+	uint32 code = 4;						// 結果回應
+	string timestamp = 5;					// 時間戳記
+}
