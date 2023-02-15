@@ -5,26 +5,26 @@ import "errors"
 var clients map[string]*ClientModel = make(map[string]*ClientModel)
 
 type ClientModel struct {
-	ID     string
-	Amount string
+	Username string
+	Amount   string
 }
 
-func New(id string, amount string) error {
-	clients[id] = &ClientModel{
-		ID:     id,
-		Amount: amount,
+func New(username string, amount string) error {
+	clients[username] = &ClientModel{
+		Username: username,
+		Amount:   amount,
 	}
 	return nil
 }
 
-func Get(id string) *ClientModel {
-	return clients[id]
+func Get(username string) *ClientModel {
+	return clients[username]
 }
 
-func Modify(id string, amount string) error {
-	if _, ok := clients[id]; !ok {
+func Modify(username string, amount string) error {
+	if _, ok := clients[username]; !ok {
 		return errors.New("no such client")
 	}
-	clients[id].Amount = amount
+	clients[username].Amount = amount
 	return nil
 }

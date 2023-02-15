@@ -1,54 +1,42 @@
 package main
 
 import (
-	"bufio"
+	"context"
 	"fmt"
 	"net"
 )
 
 func main() {
 
-	ipaddr := "0.0.0.0" + ":" + "2004"
+	ip := "127.0.0.1"
+	port := "8001"
 
-	c, err := net.Listen("tcp", ipaddr)
+	ipaddr := ip + ":" + port
+	listener, err := net.Listen("tcp", ipaddr)
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("fail to listen tcp %v", err)
 		return
 	}
 
-	// session
-
-	conn, err := c.Accept()
+	conn, err := listener.Accept()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Printf("fail to accept listener %v", err)
 		return
 	}
 
-	remoteAddr := conn.RemoteAddr().String()
-	fmt.Println("Client connected from: " + remoteAddr)
+	connection := NewConnection(&conn)
+	GetConnectionManager().AddConnection(GATE, connection)
 
-	connection := &Connection{}
-	connection.BufferReader = bufio.NewReaderSize(conn, 1024)
-	connection.BufferWriter = bufio.NewWriterSize(conn, 1024)
+	ctx, cancel := context.WithCancel(context.Background())
+	go connection.Start(ctx)
 
-	// Make a buffer to hold incoming data.
-	buf := make([]byte, 1024)
+	cancelChan := make(chan int, 0)
 	for {
-
-		length, err := connection.BufferReader.Read(buf)
-		if err != nil {
-			if err.Error() == "EOF" {
-				fmt.Println("Disconned from ", remoteAddr)
-				break
-			} else {
-				fmt.Println("Error reading:", err.Error())
-				break
-			}
+		select {
+		case <-cancelChan:
+			cancel()
+			return
 		}
-		connection.OnData(buf[:length], length)
-
 	}
-	// Close the connection when you're done with it.
-	conn.Close()
 
 }

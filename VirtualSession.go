@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/lisyaoran51/GoGameServerTest/dao/clientDao"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/diamonds"
 	"google.golang.org/protobuf/proto"
@@ -28,7 +29,7 @@ type VirtualSession struct {
 }
 
 func (v *VirtualSession) OnPacket(packet *Packet) error {
-
+	fmt.Printf("OnPacket %+v\n", packet)
 	if v.State == State_Disconnected {
 		return errors.New("Disconnected")
 	}
@@ -49,6 +50,7 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 
 		header := &protobuf.Header{}
 		proto.Unmarshal(pk.ProtoData, header)
+		fmt.Printf("get proto: %+v\n", header)
 
 		if v.State == State_Connecting {
 
@@ -57,50 +59,48 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 				// TODO: add client
 				header := header.GetGateLoginRequest()
 				client := &Client{
-					UserName: header.Name,
-					IP:       v.IP,
+					UserName:  header.Name,
+					IP:        v.IP,
+					SessionID: packet.Sequence,
 				}
 				v.Client = client
 
-				// header := header.GetGateLoginRequest()
-				// session.onGameClientConnect(header)
+				clientDao.New(header.Name, "10000")
 
-				// TODO: response
-				// req := &protobuf.Header{
-				// 	Uuid: protohelper.GenUUID(),
-				// 	Payload: &protobuf.Header_GateLoginResponse{
-				// 		&protobuf.GateLoginResponse{
-				// 			Code:           uint32(code),
-				// 			Username:       username,
-				// 			CryptoCurrency: loginInfo.CurrentCurrency,
-				// 			FiatCurrency:   loginInfo.CurrentFiatCurrency,
-				// 		},
-				// 	},
-				// }
+				req := &protobuf.Header{
+					Payload: &protobuf.Header_GateLoginResponse{
+						&protobuf.GateLoginResponse{
+							Code:     uint32(0),
+							Username: header.Name,
+						},
+					},
+				}
 
-				// data := protohelper.MarshalHeader(req)
+				dataBuffer, err := proto.Marshal(req)
+				if err != nil {
+					return err
+				}
 
-				// bufferData := packets.ProtoToPackets(data, len(data))
-				// session.Write(bufferData, len(bufferData))
-				// if code == errTable.ErrOk {
-				// 	SendClientExchangeRate(obj, session)
-				// 	onFinalSuccess(loginInfo, obj, session)
-				// 	bufferData := GenerateCurrencyListProto(loginInfo.CurrencyData)
-				// 	session.Write(bufferData, len(bufferData))
-				// }
+				bufferData := ProtoToPackets(dataBuffer, len(dataBuffer))
+
+				if err = v.Connection.SendPackage(int(v.ClientID), bufferData, len(bufferData)); err != nil {
+					return err
+				}
+
 				return nil
 			}
 		}
 
 		v.handleProtobuf(header)
 
-		return true
+		return nil
 
 	}
 	return nil
 }
 
 func (v *VirtualSession) handleProtobuf(header *protobuf.Header) error {
+	fmt.Printf("handleProtobuf %+v\n", header)
 	client := v.Client
 	if client == nil {
 		fmt.Printf("[Gate] session %#v 收到protobuf client是空，略過\n", v)
