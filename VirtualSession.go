@@ -7,8 +7,8 @@ import (
 	"fmt"
 
 	"github.com/lisyaoran51/GoGameServerTest/dao/clientDao"
-	"github.com/lisyaoran51/GoGameServerTest/protobuf"
-	"github.com/lisyaoran51/GoGameServerTest/protobuf/diamonds"
+	"github.com/lisyaoran51/GoGameServerTest/protobuf/flipCoin"
+	"github.com/lisyaoran51/GoGameServerTest/protobuf/game"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -48,16 +48,16 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 		binary.Read(buffer, binary.BigEndian, &pk.ProtoSize)
 		pk.ProtoData = buffer.Next(int(pk.ProtoSize))
 
-		header := &protobuf.Header{}
+		header := &game.GameMessage{}
 		proto.Unmarshal(pk.ProtoData, header)
 		fmt.Printf("get proto: %+v\n", header)
 
 		if v.State == State_Connecting {
 
 			switch header.Payload.(type) {
-			case *protobuf.Header_GateLoginRequest:
+			case *game.GameMessage_LoginReq:
 				// TODO: add client
-				header := header.GetGateLoginRequest()
+				header := header.GetLoginReq()
 				client := &Client{
 					UserName:  header.Name,
 					IP:        v.IP,
@@ -67,9 +67,9 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 
 				clientDao.New(header.Name, "10000")
 
-				req := &protobuf.Header{
-					Payload: &protobuf.Header_GateLoginResponse{
-						&protobuf.GateLoginResponse{
+				req := &game.GameMessage{
+					Payload: &game.GameMessage_LoginRes{
+						&game.LoginRes{
 							Code:     uint32(0),
 							Username: header.Name,
 						},
@@ -99,7 +99,7 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 	return nil
 }
 
-func (v *VirtualSession) handleProtobuf(header *protobuf.Header) error {
+func (v *VirtualSession) handleProtobuf(header *game.GameMessage) error {
 	fmt.Printf("handleProtobuf %+v\n", header)
 	client := v.Client
 	if client == nil {
@@ -108,22 +108,22 @@ func (v *VirtualSession) handleProtobuf(header *protobuf.Header) error {
 	}
 	//logger.Get().Infof("[Client] %s 收到protobuf %s", client.GetLoginname(), header.String())
 	switch header.Payload.(type) {
-	case *protobuf.Header_DiamondsCHeader:
-		param := header.GetDiamondsCHeader()
+	case *game.GameMessage_FlipCoinMessage:
+		param := header.GetFlipCoinMessage()
 		switch param.Payload.(type) {
-		case *diamonds.CHeader_DiamondsTsBet:
+		case *flipCoin.GameMessage_BetReq:
 			//請求下注
-			reqHeader := param.GetDiamondsTsBet()
+			reqHeader := param.GetBetReq()
 			err := Bet(client, reqHeader)
 
 			if err != nil {
 				//失敗了就提前回應，不然要等API扣款完成
 
-				req := &protobuf.Header{
-					Payload: &protobuf.Header_DiamondsCHeader{
-						&diamonds.CHeader{
-							Payload: &diamonds.CHeader_DiamondsBetRes{
-								&diamonds.DIAMONDS_BET_RES{
+				req := &game.GameMessage{
+					Payload: &game.GameMessage_FlipCoinMessage{
+						&flipCoin.GameMessage{
+							Payload: &flipCoin.GameMessage_BetRes{
+								&flipCoin.BetRes{
 									Code: uint32(111),
 								},
 							},
