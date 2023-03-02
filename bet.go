@@ -2,18 +2,18 @@ package main
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"time"
 
 	"github.com/lisyaoran51/GoGameServerTest/dao/clientDao"
-	"github.com/lisyaoran51/GoGameServerTest/protobuf"
-	"github.com/lisyaoran51/GoGameServerTest/protobuf/diamonds"
+	"github.com/lisyaoran51/GoGameServerTest/logger"
+	"github.com/lisyaoran51/GoGameServerTest/packet"
+	"github.com/lisyaoran51/GoGameServerTest/protobuf/flipCoin"
+	"github.com/lisyaoran51/GoGameServerTest/protobuf/game"
 	"github.com/shopspring/decimal"
-	"google.golang.org/protobuf/proto"
 )
 
-func Bet(client *Client, reqHeader *diamonds.DIAMONDS_TS_BET) error {
+func Bet(client *Client, reqHeader *flipCoin.BetReq) error {
 
 	clientModel := clientDao.Get(client.UserName)
 
@@ -44,37 +44,34 @@ func Bet(client *Client, reqHeader *diamonds.DIAMONDS_TS_BET) error {
 		winAmount = betAmount.Mul(decimal.NewFromInt(2))
 		balance.Add(winAmount)
 		clientDao.Modify(client.UserName, balance.String())
-		fmt.Printf("win %s\n", betAmount.Mul(decimal.NewFromInt(2)).String())
+		logger.Infof("[Bet] win %s\n", betAmount.Mul(decimal.NewFromInt(2)).String())
 	} else {
 		// lose
-		fmt.Printf("lose %s\n", betAmount.String())
+		logger.Infof("[Bet] lose %s\n", betAmount.String())
 	}
 
-	fmt.Printf("[Client] %s 發送扣款回應給玩家\n", clientModel.Username)
+	logger.Infof("[Bet] %s 發送扣款回應給玩家\n", clientModel.Username)
 	//發送回應給client
-	cheader := &protobuf.Header_DiamondsCHeader{
-		&diamonds.CHeader{
-			Payload: &diamonds.CHeader_DiamondsBetRes{
-				&diamonds.DIAMONDS_BET_RES{
-					Betamount: betAmount.String(),
-					Code:      uint32(0),
-					Bettime:   uint64(time.Now().Unix()),
-					Win:       winAmount.String(),
+	res := &game.GameMessage{
+		Payload: &game.GameMessage_FlipCoinMessage{
+			&flipCoin.GameMessage{
+				Payload: &flipCoin.GameMessage_BetRes{
+					&flipCoin.BetRes{
+						Betamount: betAmount.String(),
+						Code:      uint32(0),
+						Bettime:   uint64(time.Now().Unix()),
+						Win:       winAmount.String(),
+					},
 				},
 			},
-		}}
-
-	dataBuffer, err := proto.Marshal(&protobuf.Header{
-		Payload: cheader,
-	})
-	if err != nil {
-		return err
+		},
 	}
 
-	bufferData := ProtoToPackets(dataBuffer, len(dataBuffer))
+	resPacket := packet.NewProtobufPacket(0, res)
 
 	connection := GetConnectionManager().GetConnection(GATE)
-	if err = connection.SendPackage(int(client.SessionID), bufferData, len(bufferData)); err != nil {
+	if err = connection.SendPackage(client.SessionID, resPacket.ToByte()); err != nil {
+		logger.Errorf("[Bet] %s 發送扣款回應給玩家失敗: %v", err)
 		return err
 	}
 

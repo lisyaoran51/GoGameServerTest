@@ -1,15 +1,14 @@
 package main
 
 import (
-	"bytes"
-	"encoding/binary"
 	"errors"
 	"fmt"
 
 	"github.com/lisyaoran51/GoGameServerTest/dao/clientDao"
+	"github.com/lisyaoran51/GoGameServerTest/logger"
+	"github.com/lisyaoran51/GoGameServerTest/packet"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/flipCoin"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/game"
-	"google.golang.org/protobuf/proto"
 )
 
 func NewVirtualSession(c *Connection, clientID uint32, ip uint32) *VirtualSession {
@@ -20,6 +19,12 @@ func NewVirtualSession(c *Connection, clientID uint32, ip uint32) *VirtualSessio
 	}
 }
 
+type Client struct {
+	IP        uint32 /**< \brief 客戶端當前 IP */
+	UserName  string //不帶pid的帳號名稱
+	SessionID uint32
+}
+
 type VirtualSession struct {
 	Connection *Connection
 	ClientID   uint32
@@ -28,46 +33,43 @@ type VirtualSession struct {
 	Client     *Client
 }
 
-func (v *VirtualSession) OnPacket(packet *Packet) error {
-	fmt.Printf("OnPacket %+v\n", packet)
+func (v *VirtualSession) OnPacket(p packet.Packet) error {
+	logger.Infof("[VirtualSession.OnPacket] get packet %+v", p)
 	if v.State == State_Disconnected {
 		return errors.New("Disconnected")
 	}
 
-	cmd := packet.Command
-	if cmd == CmdProtoBuf {
+	switch p.GetCommand() {
+	case packet.Command(packet.ProtobufCommand):
 		if v.State != State_Connecting && v.State != State_Connected {
-			fmt.Printf("wrong state %d\n", v.State)
+			logger.Errorf("[VirtualSession.OnPacket] wrong state %+v", v.State)
 			return errors.New("state error")
 		}
 
-		buffer := bytes.NewBuffer(packet.Body)
-		pk := PkProtoBuf{
-			Packet: *packet,
+		protobufPacket := p.(*packet.ProtobufPacket)
+		gameMessage, err := protobufPacket.GetProtobuf()
+		if err != nil {
+			logger.Errorf("[VirtualSession.OnPacket] failed to parse game message %v", err)
+			return err
 		}
-		binary.Read(buffer, binary.BigEndian, &pk.ProtoSize)
-		pk.ProtoData = buffer.Next(int(pk.ProtoSize))
-
-		header := &game.GameMessage{}
-		proto.Unmarshal(pk.ProtoData, header)
-		fmt.Printf("get proto: %+v\n", header)
 
 		if v.State == State_Connecting {
 
-			switch header.Payload.(type) {
+			switch gameMessage.Payload.(type) {
 			case *game.GameMessage_LoginReq:
 				// TODO: add client
-				header := header.GetLoginReq()
+				header := gameMessage.GetLoginReq()
 				client := &Client{
 					UserName:  header.Name,
 					IP:        v.IP,
-					SessionID: packet.Sequence,
+					SessionID: p.GetSequence(),
 				}
 				v.Client = client
 
 				clientDao.New(header.Name, "10000")
+				logger.Infof("[VirtualSession.OnPacket] get login request packet. user [%s], seuqence [%d]", header.Name, p.GetSequence())
 
-				req := &game.GameMessage{
+				res := &game.GameMessage{
 					Payload: &game.GameMessage_LoginRes{
 						&game.LoginRes{
 							Code:     uint32(0),
@@ -76,14 +78,12 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 					},
 				}
 
-				dataBuffer, err := proto.Marshal(req)
-				if err != nil {
-					return err
+				resPacket := packet.NewProtobufPacket(p.GetSequence(), res)
+				if resPacket == nil {
+					return errors.New("[VirtualSession.OnPacket] fail to new protobuf packet")
 				}
 
-				bufferData := ProtoToPackets(dataBuffer, len(dataBuffer))
-
-				if err = v.Connection.SendPackage(int(v.ClientID), bufferData, len(bufferData)); err != nil {
+				if err = v.Connection.SendPackage(v.ClientID, resPacket.ToByte()); err != nil {
 					return err
 				}
 
@@ -91,7 +91,9 @@ func (v *VirtualSession) OnPacket(packet *Packet) error {
 			}
 		}
 
-		v.handleProtobuf(header)
+		v.handleProtobuf(gameMessage)
+
+		logger.Infof("[VirtualSession.OnPacket] get proto: %+v", gameMessage)
 
 		return nil
 
@@ -131,14 +133,9 @@ func (v *VirtualSession) handleProtobuf(header *game.GameMessage) error {
 					},
 				}
 
-				dataBuffer, err := proto.Marshal(req)
-				if err != nil {
-					return err
-				}
+				resPacket := packet.NewProtobufPacket(0, req)
 
-				bufferData := ProtoToPackets(dataBuffer, len(dataBuffer))
-
-				if err = v.Connection.SendPackage(int(v.ClientID), bufferData, len(bufferData)); err != nil {
+				if err = v.Connection.SendPackage(v.ClientID, resPacket.ToByte()); err != nil {
 					return err
 				}
 			}
@@ -148,8 +145,8 @@ func (v *VirtualSession) handleProtobuf(header *game.GameMessage) error {
 	return nil
 }
 
-func (v *VirtualSession) Write(body []byte, size int) error {
+func (v *VirtualSession) Write(body []byte) error {
 
-	return v.Connection.SendPackage(int(v.ClientID), body, size)
+	return v.Connection.SendPackage(v.ClientID, body)
 
 }

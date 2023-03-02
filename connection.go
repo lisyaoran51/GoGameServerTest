@@ -2,11 +2,14 @@ package main
 
 import (
 	"bufio"
-	"bytes"
 	"context"
-	"encoding/binary"
+	"errors"
 	"fmt"
 	"net"
+	"sync"
+
+	"github.com/lisyaoran51/GoGameServerTest/logger"
+	"github.com/lisyaoran51/GoGameServerTest/packet"
 )
 
 const (
@@ -30,6 +33,7 @@ type Connection struct {
 	Connection      *net.Conn
 	BufferReader    *bufio.Reader
 	BufferWriter    *bufio.Writer
+	Lock            sync.RWMutex
 	VirtualSessions map[uint32]*VirtualSession
 }
 
@@ -41,96 +45,80 @@ func (c *Connection) GetVirtualSession(sequence uint32) *VirtualSession {
 }
 
 func (c *Connection) OnData(data []byte, length int) error {
+	logger.Infof("[Connection.OnData] get data len: %d", length)
 
-	fmt.Printf("len: %d, recv: %q\n", length, string(data[:length]))
+	packet, err := packet.GetPacker().Unpack(data)
+	if err != nil {
+		logger.Warningf("[Connection.OnData] failed to unpack due to %v", err)
+	}
 
-	dataBuffer := bytes.NewBuffer(data)
-
-	// 讀標頭
-	packet := &Packet{}
-
-	binary.Read(dataBuffer, binary.BigEndian, &packet.Command)
-	binary.Read(dataBuffer, binary.BigEndian, &packet.Size)
-	binary.Read(dataBuffer, binary.BigEndian, &packet.Sequence)
-
-	packet.Body = dataBuffer.Next(int(packet.Size) - PacketHeaderSize)
-
-	fmt.Printf("packet: %+v\n", packet)
-
-	c.OnPacket(packet)
-
-	return nil
+	return c.OnPacket(packet)
 }
 
-func (c *Connection) OnPacket(packet *Packet) error {
+func (c *Connection) OnPacket(p packet.Packet) error {
 
-	buffer := bytes.NewBuffer(packet.Body)
+	switch p.GetCommand() {
+	case packet.PackageCommand:
+		logger.Infof("[Connection.OnPacket] get PackageCommand")
 
-	switch packet.Command {
-	case CmdPackage:
-		fmt.Printf("CmdPackage:\n")
-		packageSize := int(packet.Size) - PacketHeaderSize
-		packageData := buffer.Next(packageSize)
-		if packet.Sequence == 0 {
-			//gateway data
-			c.OnData(packageData, packageSize)
-
-		} else {
-			if vs, ok := c.VirtualSessions[packet.Sequence]; ok {
-				//gatesession_packethandling.go/onGameClientConnect
-
-				dataBuffer := bytes.NewBuffer(packageData)
-				customPacket := &Packet{}
-
-				binary.Read(dataBuffer, binary.BigEndian, &customPacket.Command)
-				binary.Read(dataBuffer, binary.BigEndian, &customPacket.Size)
-				binary.Read(dataBuffer, binary.BigEndian, &customPacket.Sequence)
-
-				customPacket.Body = dataBuffer.Next(int(customPacket.Size) - PacketHeaderSize)
-
-				vs.OnPacket(customPacket)
-			}
+		packagePacket := p.(*packet.PackagePacket)
+		subPacket, err := packagePacket.GetSubpacket()
+		if err != nil {
+			logger.Errorf("[Connection.OnPacket] failed to get sub packet")
+			return err
 		}
 
-		return nil
-	case CmdClientEnter:
-		fmt.Printf("CmdClientEnter:\n")
-
-		if _, ok := c.VirtualSessions[packet.Sequence]; !ok {
-			var clientIP uint32
-			binary.Read(buffer, binary.BigEndian, &clientIP)
-			vsession := NewVirtualSession(c, packet.Sequence, clientIP)
-			c.VirtualSessions[packet.Sequence] = vsession
-			fmt.Printf("virtual session added to [%d]\n", packet.Sequence)
+		if p.GetSequence() == 0 {
+			return c.OnPacket(subPacket)
 		}
+
+		if vs, ok := c.VirtualSessions[p.GetSequence()]; ok {
+			vs.OnPacket(subPacket)
+			return nil
+		}
+
+		logger.Errorf("[Connection.OnPacket] virtual session %s not exist", p.GetSequence())
+		return errors.New("no such virtual session")
+
+	case packet.ClientEnterReqCommand:
+		logger.Infof("[Connection.OnPacket] get ClientEnterReqCommand")
+
+		clientEnterReqPacket := p.(*packet.ClientEnterReqPacket)
+
+		if _, ok := c.VirtualSessions[p.GetSequence()]; ok {
+			logger.Infof("[Connection.OnPacket] virtual session [%d] already exist", p.GetSequence())
+			return nil
+		}
+
+		vsession := NewVirtualSession(c, p.GetSequence(), clientEnterReqPacket.GetIP())
+		c.Lock.Lock()
+		defer c.Lock.Unlock()
+		c.VirtualSessions[p.GetSequence()] = vsession
+		logger.Infof("[Connection.OnPacket] virtual session added to [%d]", p.GetSequence())
 		return nil
 	}
 	return nil
 }
 
-func (c *Connection) SendPackage(seq int, body []byte, size int) error {
+func (c *Connection) SendPackage(seq uint32, body []byte) error {
 
-	pkPackage := PkPackage{}
+	packer := packet.GetPacker()
 
-	pkPackage.Head.Cmd = CmdPackage
-	pkPackage.Head.Seq = uint32(seq)
-	pkPackage.Head.Size = uint32(PackageSize + size)
-
-	//tmpData := pbytes.GetCap(gatecommand.PackageSize + size)
-	tmpData := make([]byte, 0, PackageSize+uint32(PackageSize+size))
-	buffer := bytes.NewBuffer(tmpData)
-
-	binary.Write(buffer, binary.BigEndian, pkPackage)
-
-	buffer.Write(body[:size])
-
-	_, err := c.BufferWriter.Write(buffer.Bytes())
-
+	packagePacket, err := packer.Pack(packet.PackageCommand, seq, body)
 	if err != nil {
+		logger.Errorf("[Connection.SendPackage] fail to package seq[%d]: %v", seq, err)
 		return err
 	}
+
+	_, err = c.BufferWriter.Write(packagePacket.ToByte())
+	if err != nil {
+		logger.Errorf("[Connection.SendPackage] fail to write buffer seq[%d]: %v", seq, err)
+		return err
+	}
+
 	err = c.BufferWriter.Flush()
 	if err != nil {
+		logger.Errorf("[Connection.SendPackage] fail to flush seq[%d]: %v", seq, err)
 		return err
 	}
 	return nil
