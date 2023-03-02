@@ -1,4 +1,4 @@
-package main
+package task
 
 import (
 	"errors"
@@ -7,32 +7,31 @@ import (
 
 	"github.com/lisyaoran51/GoGameServerTest/dao/clientDao"
 	"github.com/lisyaoran51/GoGameServerTest/logger"
-	"github.com/lisyaoran51/GoGameServerTest/packet"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/flipCoin"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/game"
 	"github.com/shopspring/decimal"
 )
 
-func Bet(client *Client, reqHeader *flipCoin.BetReq) error {
+func Bet(ip uint32, username string, sessionID uint32, reqHeader *flipCoin.BetReq) (*game.GameMessage, error) {
 
-	clientModel := clientDao.Get(client.UserName)
+	clientModel := clientDao.Get(username)
 
 	betAmount, err := decimal.NewFromString(reqHeader.Betamount)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	balance, err := decimal.NewFromString(clientModel.Amount)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	if balance.LessThan(betAmount) {
-		return errors.New("balance not enough")
+		return nil, errors.New("balance not enough")
 	}
 
 	balance = balance.Sub(betAmount)
-	clientDao.Modify(client.UserName, balance.String())
+	clientDao.Modify(username, balance.String())
 
 	rand.Seed(time.Now().UnixNano())
 
@@ -43,7 +42,7 @@ func Bet(client *Client, reqHeader *flipCoin.BetReq) error {
 		// win
 		winAmount = betAmount.Mul(decimal.NewFromInt(2))
 		balance.Add(winAmount)
-		clientDao.Modify(client.UserName, balance.String())
+		clientDao.Modify(username, balance.String())
 		logger.Infof("[Bet] win %s\n", betAmount.Mul(decimal.NewFromInt(2)).String())
 	} else {
 		// lose
@@ -67,13 +66,5 @@ func Bet(client *Client, reqHeader *flipCoin.BetReq) error {
 		},
 	}
 
-	resPacket := packet.NewProtobufPacket(0, res)
-
-	connection := GetConnectionManager().GetConnection(GATE)
-	if err = connection.SendPackage(client.SessionID, resPacket.ToByte()); err != nil {
-		logger.Errorf("[Bet] %s 發送扣款回應給玩家失敗: %v", err)
-		return err
-	}
-
-	return nil
+	return res, nil
 }

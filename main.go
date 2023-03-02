@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 	"net"
+
+	"github.com/lisyaoran51/GoGameServerTest/connection"
+	"github.com/lisyaoran51/GoGameServerTest/global"
 )
 
 func main() {
@@ -24,11 +27,11 @@ func main() {
 		return
 	}
 
-	connection := NewConnection(&conn)
-	GetConnectionManager().AddConnection(GATE, connection)
+	gateConnection := connection.NewConnection(&conn)
+	connection.GetConnectionManager().AddConnection(global.GATE, gateConnection)
 
 	ctx, cancel := context.WithCancel(context.Background())
-	go connection.Start(ctx)
+	go gateConnection.Start(ctx)
 
 	cancelChan := make(chan int, 0)
 	for {

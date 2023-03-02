@@ -1,4 +1,4 @@
-package main
+package connection
 
 import (
 	"errors"
@@ -9,6 +9,7 @@ import (
 	"github.com/lisyaoran51/GoGameServerTest/packet"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/flipCoin"
 	"github.com/lisyaoran51/GoGameServerTest/protobuf/game"
+	"github.com/lisyaoran51/GoGameServerTest/task"
 )
 
 func NewVirtualSession(c *Connection, clientID uint32, ip uint32) *VirtualSession {
@@ -116,12 +117,12 @@ func (v *VirtualSession) handleProtobuf(header *game.GameMessage) error {
 		case *flipCoin.GameMessage_BetReq:
 			//請求下注
 			reqHeader := param.GetBetReq()
-			err := Bet(client, reqHeader)
+			res, err := task.Bet(client.IP, client.UserName, client.SessionID, reqHeader)
 
 			if err != nil {
 				//失敗了就提前回應，不然要等API扣款完成
 
-				req := &game.GameMessage{
+				res := &game.GameMessage{
 					Payload: &game.GameMessage_FlipCoinMessage{
 						&flipCoin.GameMessage{
 							Payload: &flipCoin.GameMessage_BetRes{
@@ -133,12 +134,21 @@ func (v *VirtualSession) handleProtobuf(header *game.GameMessage) error {
 					},
 				}
 
-				resPacket := packet.NewProtobufPacket(0, req)
+				resPacket := packet.NewProtobufPacket(0, res)
 
 				if err = v.Connection.SendPackage(v.ClientID, resPacket.ToByte()); err != nil {
 					return err
 				}
 			}
+
+			resPacket := packet.NewProtobufPacket(0, res)
+
+			if err = v.Connection.SendPackage(v.ClientID, resPacket.ToByte()); err != nil {
+				logger.Errorf("[VirtualSession] %s 發送扣款回應給玩家失敗: %v", err)
+				return err
+			}
+
+			return nil
 		}
 		return nil
 	}
